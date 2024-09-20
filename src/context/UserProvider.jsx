@@ -79,6 +79,44 @@ const UserProvider = ({ children }) => {
     setLoading(false);
   };
 
+  const postClient = async (token, user) => {
+
+    setLoading(true);
+
+    const options = {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: token },
+      body: JSON.stringify(user),
+    };
+
+    try {
+      const res = await fetch("http://localhost:4000/users/client", options);
+      const data = await res.json();
+
+      if (res.ok) {
+        setMessage({});
+        setMessage({
+          title: data.message,
+          msg: "satisfactoriamente",
+          type: "success",
+        });
+      }
+
+      if (res.status === 400) {
+        setMessages(data);
+      }
+
+      if (res.status === 404) {
+        setMessage({});
+        setMessage({ title: "Error", msg: data.message, type: "error" });
+      }
+    } catch (error) {
+      console.log(error);
+    }
+
+    setLoading(false);
+  };
+
   const loginUser = async (user) => {
     setLoading(true);
 
@@ -139,7 +177,8 @@ const UserProvider = ({ children }) => {
     setLoading(true);
     const clientUpdate = {
       id: client.id,
-      rol: client.rol,
+      name: client.name,
+      email: client.email,
     };
     console.log(clientUpdate);
     const options = {
@@ -278,6 +317,7 @@ const UserProvider = ({ children }) => {
         getUsersAll,
         setMessage,
         setLoading,
+        postClient
       }}
     >
       {children}

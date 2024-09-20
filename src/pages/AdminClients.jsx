@@ -4,7 +4,7 @@ import { Column } from "primereact/column";
 import { Toast } from "primereact/toast";
 import { Button } from "primereact/button";
 import { Toolbar } from "primereact/toolbar";
-import { RadioButton } from "primereact/radiobutton";
+import { classNames } from 'primereact/utils';
 import { Dialog } from "primereact/dialog";
 import { FilterMatchMode } from "primereact/api";
 import { Tag } from "primereact/tag";
@@ -13,14 +13,13 @@ import { Dropdown } from "primereact/dropdown";
 import useUser from "../hooks/useUser";
 import { useNavigate } from "react-router-dom";
 import useOrder from "../hooks/useOrder";
+import { InputText } from "primereact/inputtext";
 
 export default function AdminClients() {
   let emptyClient = {
     name: "",
     email: "",
-    country: "",
-    city: "",
-    rol: "",
+    rol: "client"
   };
 
   const [client, setClient] = useState(emptyClient);
@@ -30,24 +29,22 @@ export default function AdminClients() {
   const [selectedClients, setSelectedClients] = useState(null);
   const [submitted, setSubmitted] = useState(false);
 
-  const { handleClientOrder } = useOrder()
-  const { auth } = useUser()
-
+  
   const navigate = useNavigate()
-
+  
   const toast = useRef(null);
   const dt = useRef(null);
-
+  
   const [filters, setFilters] = useState({
     name: { value: null, matchMode: FilterMatchMode.STARTS_WITH },
-    email: { value: null, matchMode: FilterMatchMode.STARTS_WITH },
-    country: { value: null, matchMode: FilterMatchMode.STARTS_WITH },
-    city: { value: null, matchMode: FilterMatchMode.STARTS_WITH },
-    rol: { value: null, matchMode: FilterMatchMode.EQUALS },
+    email: { value: null, matchMode: FilterMatchMode.STARTS_WITH }
   });
   const [statuses] = useState(["client", "admin"]);
+  
+  const { handleClientOrder } = useOrder()
 
   const {
+    auth,
     clients,
     loading,
     updateUserByAdmin,
@@ -55,7 +52,8 @@ export default function AdminClients() {
     deleteClients,
     getUsersAll,
     message,
-    setMessage
+    setMessage,
+    postClient
   } = useUser();
 
   useEffect(() => {
@@ -83,7 +81,7 @@ export default function AdminClients() {
     setSubmitted(true);
     setClientDialog(true);
   };
-
+  
   const hideDialog = () => {
     setSubmitted(false);
     setClientDialog(false);
@@ -97,20 +95,26 @@ export default function AdminClients() {
     setDeleteClientsDialog(false);
   };
 
-  const editRolClient = () => {
+  const saveClient = async() => {
     setSubmitted(true);
-
+    
     if (client.name.trim()) {
 
-      updateUserByAdmin(client);
-      
-      setClient(emptyClient);
-      setClientDialog(false);
-      setSubmitted(false);
-      
+        if (client.id) {
+            await updateUserByAdmin(client, auth.token)
+            //toast.current.show({ severity: 'success', summary: 'Cliente editado', detail: "satisfactoriamente", life: 3000 });
+        } else {
+            await postClient(auth.token, client)
+            //toast.current.show({ severity: 'success', summary: 'Cliente guardado', detail: "satisfactoriamente", life: 3000 });
+        }
+        
+        setSubmitted(false);
+        setClientDialog(false);
+        setClient(emptyClient);
     }
-  };
+};
 
+  
   const addOrderProducts = async(rowClient) => {
     
     await handleClientOrder(auth, rowClient);
@@ -159,12 +163,12 @@ export default function AdminClients() {
 
   };
 
-  const onRolChange = (e) => {
+  const onInputChange = (e, name) => {
+    const val = (e.target && e.target.value) || '';
     let _client = { ...client };
-
-    _client["rol"] = e.value;
+    _client[`${name}`] = val;
     setClient(_client);
-  };
+};
 
   const leftToolbarTemplate = () => {
     return (
@@ -174,7 +178,6 @@ export default function AdminClients() {
           icon="pi pi-plus"
           severity="success"
           onClick={openNew}
-          disabled={true}
         />
         <Button
           label="Delete"
@@ -222,10 +225,10 @@ export default function AdminClients() {
     </div>
   );
 
-  const productDialogFooter = (
+  const clientDialogFooter = (
     <React.Fragment>
       <Button label="Cancel" icon="pi pi-times" outlined onClick={hideDialog} />
-      <Button label="Save" loading={loading} icon="pi pi-check" onClick={editRolClient} />
+      <Button label="Save" loading={loading} icon="pi pi-check" onClick={saveClient} />
     </React.Fragment>
   );
 
@@ -264,29 +267,7 @@ export default function AdminClients() {
     </React.Fragment>
   );
 
-  const statusBodyTemplate = (rowData) => {
-    return <Tag value={rowData.rol} />;
-  };
-
-  const statusItemTemplate = (option) => {
-    return <Tag value={option} />;
-  };
-
-  const statusRowFilterTemplate = (options) => {
-    return (
-      <Dropdown
-        value={options.value}
-        options={statuses}
-        onChange={(e) => options.filterApplyCallback(e.value)}
-        itemTemplate={statusItemTemplate}
-        placeholder="Select One"
-        className="p-column-filter"
-        showClear
-        style={{ minWidth: "12rem" }}
-      />
-    );
-  };
-
+ 
   return (
     <Layout>
       <Toast ref={toast} />
@@ -328,16 +309,6 @@ export default function AdminClients() {
             style={{ minWidth: "16rem" }}
           ></Column>
           <Column
-            field="rol"
-            header="Rol"
-            showFilterMenu={false}
-            filterMenuStyle={{ width: "14rem" }}
-            style={{ minWidth: "12rem" }}
-            body={statusBodyTemplate}
-            filter
-            filterElement={statusRowFilterTemplate}
-          ></Column>
-          <Column
             body={actionBodyTemplate}
             exportable={false}
             style={{ minWidth: "12rem" }}
@@ -352,61 +323,22 @@ export default function AdminClients() {
         header="Detalles del Cliente"
         modal
         className="p-fluid"
-        footer={productDialogFooter}
+        footer={clientDialogFooter}
         onHide={hideDialog}
       >
         <div className="field">
           <label htmlFor="name" className="font-bold">
             Nombre
           </label>
-          <p>{client.name}</p>
+          <InputText id="name" value={client.name} onChange={(e) => onInputChange(e, 'name')} required autoFocus className={classNames({ 'p-invalid': submitted && !client.name })} />
+                    {submitted && !client.name && <small className="p-error">Nombre es requerido.</small>}
         </div>
         <div className="field">
           <label htmlFor="email" className="font-bold">
             Correo
           </label>
-          <p>{client.email}</p>
-        </div>
-
-        <div className="formgrid grid">
-          <div className="field col">
-            <label htmlFor="country" className="font-bold">
-              Pais
-            </label>
-            <p>{client.country}</p>
-          </div>
-          <div className="field col">
-            <label htmlFor="city" className="font-bold">
-              Ciudad
-            </label>
-            <p>{client.city}</p>
-          </div>
-        </div>
-
-        <div className="field">
-          <label className="mb-3 font-bold">Rol</label>
-          <div className="formgrid grid">
-            <div className="field-radiobutton col-6">
-              <RadioButton
-                inputId="admin"
-                name="rol"
-                value="admin"
-                onChange={onRolChange}
-                checked={client.rol === "admin"}
-              />
-              <label htmlFor="admin">Admin</label>
-            </div>
-            <div className="field-radiobutton col-6">
-              <RadioButton
-                inputId="client"
-                name="rol"
-                value="client"
-                onChange={onRolChange}
-                checked={client.rol === "client"}
-              />
-              <label htmlFor="client">Client</label>
-            </div>
-          </div>
+          <InputText id="email" type="email" value={client.email} onChange={(e) => onInputChange(e, 'email')} required autoFocus className={classNames({ 'p-invalid': submitted && !client.email })} />
+                    {submitted && !client.email && <small className="p-error">Email es requerido.</small>}
         </div>
       </Dialog>
 
@@ -426,7 +358,7 @@ export default function AdminClients() {
           />
           {client && (
             <span>
-              Are you sure you want to delete <b>{client.name}</b>?
+              Estas seguro de eliminar a <b>{client.name} ?</b>?
             </span>
           )}
         </div>
@@ -447,7 +379,7 @@ export default function AdminClients() {
             style={{ fontSize: "2rem" }}
           />
           {client && (
-            <span>Are you sure you want to delete the selected clients?</span>
+            <span>estas seguro de eliminar estos Clientes ?</span>
           )}
         </div>
       </Dialog>

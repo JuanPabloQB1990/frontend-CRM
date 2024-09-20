@@ -85,7 +85,7 @@ const RegisterPage = () => {
       country: "",
       city: "",
       address: "",
-      rol: "client",
+      rol: "admin",
       password,
       repeat_password,
     };
